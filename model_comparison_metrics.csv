@@ -1,0 +1,6 @@
+Metric,Stock Pretrained YOLO11s,Sentinel-Vision Trained YOLO11s
+mAP@50 (All Classes),0.0001,0.8048
+mAP@50-95 (All Classes),0.0,0.5834
+Precision,0.0025,0.8709
+Recall,0.0099,0.7605
+Inference Speed (ms/img),7.88,7.52

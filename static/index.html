@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SENTINEL-VISION | AI Worker Safety & PPE Compliance Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background-color: #0b1120; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background-color: #111827; border: 1px solid #1f2937; border-radius: 0.75rem; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="h-10 w-10 rounded-lg bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl">
+        SV
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-wide text-white flex items-center gap-2">
+          SENTINEL-VISION
+          <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            YOLO11s Custom PPE Engine
+          </span>
+        </h1>
+        <p class="text-xs text-slate-400">Real-Time Worker Tracking, Pose-Aware PPE Association & Hazardous Zone Monitor</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-2 shadow-lg shadow-emerald-900/30">
+        <span>Upload Site / Mine Video</span>
+        <input id="videoUploadInput" type="file" accept="video/*" class="hidden" />
+      </label>
+      <div id="liveBadge" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs">
+        <span class="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="fpsLabel" class="font-mono text-slate-200">0.0 FPS</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6">
+
+    <!-- KPI Cards Row -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">PPE Compliance Rate</div>
+        <div id="kpiCompliance" class="text-3xl font-bold text-emerald-400 mt-1">100%</div>
+        <div class="text-xs text-slate-500 mt-1">Temporal-validated ratio</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">Site Risk Score</div>
+        <div class="flex items-baseline gap-2 mt-1">
+          <span id="kpiRisk" class="text-3xl font-bold text-emerald-400">0</span>
+          <span class="text-xs text-slate-500">/ 100</span>
+        </div>
+        <div id="kpiRiskLabel" class="text-xs text-emerald-400 mt-1">LOW RISK</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">Active Workers Tracked</div>
+        <div id="kpiWorkers" class="text-3xl font-bold text-white mt-1">0</div>
+        <div class="text-xs text-slate-500 mt-1">ByteTrack multi-object IDs</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">Active PPE Violations</div>
+        <div id="kpiViolations" class="text-3xl font-bold text-rose-400 mt-1">0</div>
+        <div class="text-xs text-slate-500 mt-1">Missing helmet / vest / gear</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-xs text-slate-400 uppercase tracking-wider">Hazard Zone Intrusions</div>
+        <div id="kpiIntrusions" class="text-3xl font-bold text-amber-400 mt-1">0</div>
+        <div class="text-xs text-slate-500 mt-1">Restricted perimeter breaches</div>
+      </div>
+    </div>
+
+    <!-- Video Feed + Incident Evidence Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Left 2 Columns: Live AI Video Player & Controls -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="card overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold text-slate-200">Live AI Safety Inference Stream</span>
+              <span id="videoTime" class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded">00:00.0</span>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-4 text-xs">
+              <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                <input id="zoneToggle" type="checkbox" checked class="accent-amber-500 rounded" />
+                <span>Virtual Hazard Zone</span>
+              </label>
+
+              <div class="flex items-center gap-2">
+                <span class="text-slate-400">Conf:</span>
+                <input id="confSlider" type="range" min="0.20" max="0.80" step="0.05" value="0.40" class="w-24 accent-emerald-500" />
+                <span id="confValue" class="font-mono text-emerald-400 w-8">0.40</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Canvas / Placeholder -->
+          <div class="relative bg-slate-950 aspect-video flex items-center justify-center">
+            <div id="uploadPlaceholder" class="text-center p-8 max-w-md">
+              <div class="text-4xl mb-3">📹</div>
+              <h3 class="text-base font-semibold text-slate-200">No Video Feed Active</h3>
+              <p class="text-xs text-slate-400 mt-1">
+                Click <strong>Upload Site / Mine Video</strong> in the top bar to run real-time PPE detection, worker tracking, and hazard zone analytics using <code class="text-emerald-400">sentinel_ppe_best.pt</code>.
+              </p>
+            </div>
+            <img id="videoStream" class="hidden w-full h-full object-contain" alt="Live Inference Feed" />
+          </div>
+        </div>
+
+        <!-- Bottom Analytics Row: Temporal Compliance Chart + Benchmark Comparison -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card p-4">
+            <h3 class="text-sm font-semibold text-slate-200 mb-3">Temporal Compliance & Risk Trend</h3>
+            <div class="h-52">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-slate-200">Model Benchmark (Pretrained vs. Custom)</h3>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Validated on Construction-PPE
+              </span>
+            </div>
+            <table class="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400">
+                  <th class="py-2">Metric</th>
+                  <th class="py-2">Stock YOLO11s</th>
+                  <th class="py-2 text-emerald-400">Sentinel Custom</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/70 text-slate-300">
+                <tr>
+                  <td class="py-2">mAP@50 (All PPE)</td>
+                  <td class="py-2 font-mono text-slate-400">0.0001</td>
+                  <td class="py-2 font-mono text-emerald-400 font-semibold">Custom Trained</td>
+                </tr>
+                <tr>
+                  <td class="py-2">Target Classes</td>
+                  <td class="py-2 text-slate-400">Person only</td>
+                  <td class="py-2 text-slate-200">Helmet, Vest, Gloves, Boots, Goggles + Violations</td>
+                </tr>
+                <tr>
+                  <td class="py-2">False Alert Filter</td>
+                  <td class="py-2 text-slate-400">None (Frame-by-frame)</td>
+                  <td class="py-2 text-slate-200">ByteTrack + 8-Frame Temporal Lock</td>
+                </tr>
+                <tr>
+                  <td class="py-2">Zone Intrusion</td>
+                  <td class="py-2 text-slate-400">Unsupported</td>
+                  <td class="py-2 text-slate-200">Polygon Foot-Point Geometry</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="mt-3 pt-2 border-t border-slate-800 flex flex-wrap gap-1.5" id="detectedClassesBadges">
+              <span class="text-[11px] text-slate-400">Live Detections: waiting for video...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Timestamped Visual Incident Evidence Log -->
+      <div class="card flex flex-col max-h-[820px]">
+        <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-200">Timestamped Incident Evidence</h3>
+            <p class="text-[11px] text-slate-400">Verified after 8 consecutive violation frames</p>
+          </div>
+          <span id="incidentCountBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">
+            0 Alerts
+          </span>
+        </div>
+
+        <div id="incidentList" class="p-4 space-y-3 overflow-y-auto flex-1">
+          <div class="text-center text-xs text-slate-500 py-12">
+            No verified safety incidents logged yet.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    const videoUploadInput = document.getElementById("videoUploadInput");
+    const videoStream = document.getElementById("videoStream");
+    const uploadPlaceholder = document.getElementById("uploadPlaceholder");
+    const liveBadge = document.getElementById("liveBadge");
+    const fpsLabel = document.getElementById("fpsLabel");
+    const confSlider = document.getElementById("confSlider");
+    const confValue = document.getElementById("confValue");
+    const zoneToggle = document.getElementById("zoneToggle");
+
+    // Initialize Temporal Chart
+    const ctx = document.getElementById("trendChart").getContext("2d");
+    const trendChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: "Compliance (%)",
+            data: [],
+            borderColor: "#10b981",
+            backgroundColor: "rgba(16, 185, 129, 0.12)",
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: "Risk Score",
+            data: [],
+            borderColor: "#f43f5e",
+            backgroundColor: "rgba(244, 63, 94, 0.08)",
+            tension: 0.3,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { min: 0, max: 100, grid: { color: "#1e293b" }, ticks: { color: "#94a3b8", font: { size: 10 } } },
+          x: { grid: { display: false }, ticks: { color: "#94a3b8", font: { size: 10 }, maxTicksLimit: 8 } }
+        },
+        plugins: {
+          legend: { labels: { color: "#cbd5e1", font: { size: 11 } } }
+        }
+      }
+    });
+
+    // Handle Video Upload
+    videoUploadInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      uploadPlaceholder.innerHTML = `<div class="text-sm text-emerald-400 animate-pulse">Uploading and initializing AI inference engine...</div>`;
+
+      const res = await fetch("/api/upload_video", { method: "POST", body: formData });
+      if (res.ok) {
+        uploadPlaceholder.classList.add("hidden");
+        videoStream.classList.remove("hidden");
+        liveBadge.classList.remove("hidden");
+        liveBadge.classList.add("flex");
+        // Cache-bust stream URL
+        videoStream.src = "/api/video_feed?t=" + Date.now();
+      } else {
+        alert("Failed to upload video.");
+      }
+    });
+
+    // Handle Config Updates
+    async function sendConfig() {
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conf_threshold: parseFloat(confSlider.value),
+          zone_enabled: zoneToggle.checked
+        })
+      });
+    }
+
+    confSlider.addEventListener("input", () => {
+      confValue.textContent = parseFloat(confSlider.value).toFixed(2);
+    });
+    confSlider.addEventListener("change", sendConfig);
+    zoneToggle.addEventListener("change", sendConfig);
+
+    // Poll Real-Time Analytics every 800ms
+    let lastIncidentIds = "";
+
+    setInterval(async () => {
+      try {
+        const res = await fetch("/api/analytics");
+        const data = await res.json();
+        if (!data.has_video) return;
+
+        fpsLabel.textContent = `${data.fps.toFixed(1)} FPS`;
+        document.getElementById("videoTime").textContent = `${data.timestamp_sec.toFixed(1)}s`;
+        document.getElementById("kpiWorkers").textContent = data.active_workers;
+        document.getElementById("kpiViolations").textContent = data.non_compliant_workers;
+        document.getElementById("kpiIntrusions").textContent = data.zone_intrusions;
+
+        const compEl = document.getElementById("kpiCompliance");
+        compEl.textContent = `${data.compliance_rate}%`;
+        compEl.className = `text-3xl font-bold mt-1 ${
+          data.compliance_rate >= 80 ? "text-emerald-400" : data.compliance_rate >= 50 ? "text-amber-400" : "text-rose-400"
+        }`;
+
+        const riskEl = document.getElementById("kpiRisk");
+        const riskLabel = document.getElementById("kpiRiskLabel");
+        riskEl.textContent = data.risk_score;
+        if (data.risk_score < 30) {
+          riskEl.className = "text-3xl font-bold text-emerald-400";
+          riskLabel.textContent = "LOW RISK";
+          riskLabel.className = "text-xs text-emerald-400 mt-1";
+        } else if (data.risk_score < 65) {
+          riskEl.className = "text-3xl font-bold text-amber-400";
+          riskLabel.textContent = "MODERATE RISK";
+          riskLabel.className = "text-xs text-amber-400 mt-1";
+        } else {
+          riskEl.className = "text-3xl font-bold text-rose-400";
+          riskLabel.textContent = "CRITICAL RISK";
+          riskLabel.className = "text-xs text-rose-400 mt-1";
+        }
+
+        // Update Live Class Badges
+        const badgesContainer = document.getElementById("detectedClassesBadges");
+        const entries = Object.entries(data.ppe_counts);
+        if (entries.length > 0) {
+          badgesContainer.innerHTML = entries
+            .map(([cls, cnt]) => `<span class="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">${cls}: <strong>${cnt}</strong></span>`)
+            .join("");
+        }
+
+        // Update Chart
+        if (data.history && data.history.length > 0) {
+          trendChart.data.labels = data.history.map((h) => h.time);
+          trendChart.data.datasets[0].data = data.history.map((h) => h.compliance);
+          trendChart.data.datasets[1].data = data.history.map((h) => h.risk);
+          trendChart.update("none");
+        }
+
+        // Update Incident Evidence Log only when new incidents arrive
+        const currentIds = data.incidents.map((i) => i.id).join(",");
+        if (currentIds !== lastIncidentIds) {
+          lastIncidentIds = currentIds;
+          document.getElementById("incidentCountBadge").textContent = `${data.incidents.length} Alerts`;
+          const listEl = document.getElementById("incidentList");
+
+          if (data.incidents.length === 0) {
+            listEl.innerHTML = `<div class="text-center text-xs text-slate-500 py-12">No verified safety incidents logged yet.</div>`;
+          } else {
+            listEl.innerHTML = data.incidents
+              .map(
+                (inc) => `
+              <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 flex gap-3 items-start">
+                <img src="${inc.snapshot}" class="w-20 h-20 object-cover rounded border border-slate-700 shrink-0" alt="Evidence" />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-bold text-white">${inc.worker_id}</span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">${inc.severity}</span>
+                  </div>
+                  <div class="text-xs text-rose-300 font-medium mt-1">${inc.violations.join(" • ")}</div>
+                  <div class="text-[11px] text-slate-500 font-mono mt-1">Video Timestamp: ${inc.timestamp}</div>
+                </div>
+              </div>
+            `
+              )
+              .join("");
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 800);
+  </script>
+</body>
+</html>
